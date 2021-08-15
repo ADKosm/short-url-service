@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  redis:
+    image: redis:4
+    restart: always
+    ports:
+      - "6379:6379"
+
+  application:
+    build: .
+    ports:
+      - "3000:3000"
+    links:
+      - redis

@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: main-redis-db-deploy
+spec:
+  selector:
+    matchLabels:
+      component: database
+  template:
+    metadata:
+      labels:
+        component: database
+    spec:
+      containers:
+        - name: redis
+          image: redis:4
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+spec:
+  ports:
+    - port: 6379
+  selector:
+    component: database
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shorter
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      component: web
+  template:
+    metadata:
+      labels:
+        component: web
+    spec:
+      containers:
+        - name: short-web
+          image: cr.yandex/crptgmdg64atddq2o0ep/pupa-lupovich/short-web:latest
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: short-web
+spec:
+  type: NodePort
+  ports:
+    - port: 3000
+      nodePort: 30030
+  selector:
+    component: web

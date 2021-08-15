@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Link shortener</title>
+
+    <link rel="stylesheet" href="static/css/material.min.css">
+    <link rel="stylesheet" href="static/css/styles.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+
+    <script src="static/js/material.min.js"></script>
+    <script src="static/js/jquery-3.3.1.min.js"></script>
+    <script src="static/js/main.js" defer></script>
+</head>
+<body>
+
+<div>
+    <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label" id="main-component">
+        <input class="mdl-textfield__input" type="url" id="main-input" autofocus>
+        <label class="mdl-textfield__label" for="main-input">Enter the link...</label>
+        <span class="mdl-textfield__error">Input is not a correct url!</span>
+    </div>
+
+    <button class="mdl-button mdl-js-button mdl-button--fab mdl-button--mini-fab mdl-js-ripple-effect" id="main-button">
+        <i class="material-icons">link</i>
+    </button>
+</div>
+
+<div id="main-snakbar" class="mdl-js-snackbar mdl-snackbar">
+    <div class="mdl-snackbar__text"></div>
+    <button class="mdl-snackbar__action" type="button"></button>
+</div>
+
+</body>
+</html>
