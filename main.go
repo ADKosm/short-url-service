@@ -72,7 +72,7 @@ func (h *HTTPHandler) handleGetUrl(_ http.ResponseWriter, _ *http.Request) {
 	// redirect
 }
 
-func main() {
+func NewServer() *http.Server {
 	r := mux.NewRouter()
 
 	handler := &HTTPHandler{
@@ -83,12 +83,16 @@ func main() {
 	r.HandleFunc("/{shortUrl:\\w{5}}", handler.handleGetUrl).Methods(http.MethodGet)
 	r.HandleFunc("/api/urls", handler.handlePostUrl)
 
-	srv := &http.Server{
+	return &http.Server{
 		Handler:      r,
 		Addr:         "0.0.0.0:8080",
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
+}
+
+func main() {
+	srv := NewServer()
 	log.Printf("Start serving on %s", srv.Addr)
 	log.Fatal(srv.ListenAndServe())
 }
