@@ -16,6 +16,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 )
@@ -120,7 +121,8 @@ func (s *APISuite) TestCreateAndGet() {
 
 func (s *APISuite) specValidating(transport http.RoundTripper) http.RoundTripper {
 	return RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
-		reqBody := s.readAll(req.Body)
+		log.Println("Send HTTP request:")
+		reqBody := s.printReq(req)
 
 		// validate request
 		route, params, err := s.apiSpecRouter.FindRoute(req)
@@ -139,7 +141,8 @@ func (s *APISuite) specValidating(transport http.RoundTripper) http.RoundTripper
 		if err != nil {
 			return nil, err
 		}
-		respBody := s.readAll(resp.Body)
+		log.Println("Got HTTP response:")
+		respBody := s.printResp(resp)
 
 		// Validate response against OpenAPI spec
 		s.Require().NoError(openapi3filter.ValidateResponse(ctx, &openapi3filter.ResponseValidationInput{
@@ -151,6 +154,28 @@ func (s *APISuite) specValidating(transport http.RoundTripper) http.RoundTripper
 
 		return resp, nil
 	})
+}
+
+func (s *APISuite) printReq(req *http.Request) []byte {
+	body := s.readAll(req.Body)
+
+	req.Body = io.NopCloser(bytes.NewReader(body))
+	s.Require().NoError(req.Write(os.Stdout))
+	fmt.Println()
+
+	req.Body = io.NopCloser(bytes.NewReader(body))
+	return body
+}
+
+func (s *APISuite) printResp(resp *http.Response) []byte {
+	body := s.readAll(resp.Body)
+
+	resp.Body = io.NopCloser(bytes.NewReader(body))
+	s.Require().NoError(resp.Write(os.Stdout))
+	fmt.Println()
+
+	resp.Body = io.NopCloser(bytes.NewReader(body))
+	return body
 }
 
 func (s *APISuite) readAll(in io.Reader) []byte {
