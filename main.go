@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -21,7 +22,8 @@ func handleRoot(w http.ResponseWriter, _ *http.Request) {
 }
 
 type HTTPHandler struct {
-	storage map[string]string
+	storageMu sync.RWMutex
+	storage   map[string]string
 }
 
 var alphabet = []byte("qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890")
@@ -52,7 +54,9 @@ func (h *HTTPHandler) handlePostUrl(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	newUrlKey := getRandomKey()
+	h.storageMu.Lock()
 	h.storage[newUrlKey] = data.Url
+	h.storageMu.Unlock()
 	//  http://my.site.com/bdfhfd
 
 	response := PutResponseData{
@@ -71,7 +75,9 @@ func (h *HTTPHandler) handlePostUrl(rw http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPHandler) handleGetUrl(rw http.ResponseWriter, r *http.Request) {
 	key := strings.Trim(r.URL.Path, "/")
+	h.storageMu.RLock()
 	url, found := h.storage[key]
+	h.storageMu.RUnlock()
 	if !found {
 		http.NotFound(rw, r)
 		return
