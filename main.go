@@ -7,6 +7,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -68,8 +69,14 @@ func (h *HTTPHandler) handlePostUrl(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 }
 
-func (h *HTTPHandler) handleGetUrl(_ http.ResponseWriter, _ *http.Request) {
-	// redirect
+func (h *HTTPHandler) handleGetUrl(rw http.ResponseWriter, r *http.Request) {
+	key := strings.Trim(r.URL.Path, "/")
+	url, found := h.storage[key]
+	if !found {
+		http.NotFound(rw, r)
+		return
+	}
+	http.Redirect(rw, r, url, http.StatusPermanentRedirect)
 }
 
 func NewServer() *http.Server {
