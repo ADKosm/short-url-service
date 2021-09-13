@@ -1,9 +1,8 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
-	"github.com/go-redis/redis/v8"
+	"fmt"
 	"github.com/gorilla/mux"
 	"log"
 	"math/rand"
@@ -11,119 +10,82 @@ import (
 	"time"
 )
 
-var ctx = context.Background()
-
-type AddResponse struct {
-	ShortUrl string `json:"ShortUrl"`
+func handleRoot(w http.ResponseWriter, _ *http.Request) {
+	_, err := w.Write([]byte("Hello from server"))
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "plain/text")
 }
 
-type AddRequest struct {
+type HTTPHandler struct {
+	storage map[string]string
+}
+
+var alphabet = []byte("qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890")
+
+func getRandomKey() string {
+	idBytes := make([]byte, 5)
+	for i := 0; i < len(idBytes); i++ {
+		idBytes[i] = alphabet[rand.Intn(len(alphabet))]
+	}
+	return string(idBytes)
+}
+
+type PutRequestData struct {
 	Url string `json:"url"`
 }
 
-type Handler struct {
-	redisClient *redis.Client
+type PutResponseData struct {
+	Key string `json:"key"`
 }
 
-func genShortUrl() string {
-	alphabet := []byte("qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890")
-	rand.Shuffle(len(alphabet), func(i, j int) {
-		alphabet[i], alphabet[j] = alphabet[j], alphabet[i]
-	})
-	id := string(alphabet[:8])
-	return id
-}
+func (h *HTTPHandler) handlePostUrl(rw http.ResponseWriter, r *http.Request) {
+	var data PutRequestData
 
-func (h *Handler) handleAdd(w http.ResponseWriter, r *http.Request) {
-	var req AddRequest
-
-	err := json.NewDecoder(r.Body).Decode(&req)
+	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	shortUrl := genShortUrl()
-	err = h.redisClient.Set(ctx, shortUrl, req.Url, 0).Err()
+	newUrlKey := getRandomKey()
+	h.storage[newUrlKey] = data.Url
+	//  http://my.site.com/bdfhfd
+
+	response := PutResponseData{
+		Key: newUrlKey,
+	}
+	rawResponse, _ := json.Marshal(response)
+
+	_, err = rw.Write(rawResponse)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	response := AddResponse{
-		ShortUrl: shortUrl,
-	}
-	rawRes, err := json.Marshal(response)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_, err = w.Write(rawRes)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	rw.Header().Set("Content-Type", "application/json")
 }
 
-func (h *Handler) handleRedirectToSite(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	shortKey, ok := vars["shortKey"]
-	if !ok {
-		http.Error(w, "cannot parse short key from path", http.StatusBadRequest)
-		return
-	}
-
-	url, err := h.redisClient.Get(ctx, shortKey).Result()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
-}
-
-func (h *Handler) handleNotFound(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "static/html/not-found.html")
-}
-
-func (h *Handler) handleRoot(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "static/html/index.html")
-}
-
-
-func loggingMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Println(r.RequestURI)
-		next.ServeHTTP(w, r)
-	})
+func (h *HTTPHandler) handleGetUrl(_ http.ResponseWriter, _ *http.Request) {
+	// redirect
 }
 
 func main() {
-	rand.Seed(time.Now().Unix())
-
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     "redis:6379",
-		Password: "", // no password set
-		DB:       0,  // use default DB
-	})
-	handler := &Handler{redisClient: rdb}
-
 	r := mux.NewRouter()
-	r.Use(loggingMiddleware)
 
-	fs := http.FileServer(http.Dir("static"))
-	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
+	handler := &HTTPHandler{
+		storage: make(map[string]string),
+	}
 
-	r.HandleFunc("/api/add", handler.handleAdd)
-	r.HandleFunc("/not-found", handler.handleNotFound)
-	r.HandleFunc("/{shortKey:\\w{8}}", handler.handleRedirectToSite)
-	r.HandleFunc("/", handler.handleRoot)
+	r.HandleFunc("/", handleRoot).Methods("GET", "POST")
+	r.HandleFunc("/{shortUrl:\\w{5}}", handler.handleGetUrl).Methods(http.MethodGet)
+	r.HandleFunc("/api/urls", handler.handlePostUrl)
 
 	srv := &http.Server{
 		Handler:      r,
-		Addr:         "0.0.0.0:3000",
+		Addr:         "0.0.0.0:8080",
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
