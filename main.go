@@ -60,13 +60,13 @@ func (h *HTTPHandler) handlePostUrl(rw http.ResponseWriter, r *http.Request) {
 	}
 	rawResponse, _ := json.Marshal(response)
 
+	rw.Header().Set("Content-Type", "application/json")
 	_, err = rw.Write(rawResponse)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	rw.Header().Set("Content-Type", "application/json")
 }
 
 func (h *HTTPHandler) handleGetUrl(rw http.ResponseWriter, r *http.Request) {
