@@ -43,7 +43,7 @@ func (h *HTTPHandler) handlePostUrl(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key, err := h.storage.PutURL(RedirectURL(data.Url))
+	key, err := h.storage.PutURL(r.Context(), RedirectURL(data.Url))
 	if err != nil {
 		internalError(rw, err)
 		return
@@ -66,7 +66,7 @@ func (h *HTTPHandler) handlePostUrl(rw http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPHandler) handleGetUrl(rw http.ResponseWriter, r *http.Request) {
 	key := strings.Trim(r.URL.Path, "/")
-	url, err := h.storage.GetURL(Key(key))
+	url, err := h.storage.GetURL(r.Context(), Key(key))
 	switch {
 	case err == nil:
 		http.Redirect(rw, r, string(url), http.StatusPermanentRedirect)

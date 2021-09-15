@@ -1,21 +1,31 @@
 package main
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"os"
 )
 
 var (
-	ErrNotFound = errors.New("not_found")
+	StorageError          = errors.New("storage")
+	ErrNotFound           = fmt.Errorf("%w.not_found", StorageError)
+	ErrInsertionCollision = fmt.Errorf("%w.insertion_collision", StorageError)
 )
 
 type RedirectURL string
 type Key string
 
 type Storage interface {
-	PutURL(url RedirectURL) (Key, error)
-	GetURL(key Key) (RedirectURL, error)
+	PutURL(ctx context.Context, url RedirectURL) (Key, error)
+	GetURL(ctx context.Context, key Key) (RedirectURL, error)
 }
 
 func NewStorage() Storage {
-	return &inMemoryStorage{}
+	mongoURL := os.Getenv("MONGO_URL")
+	if mongoURL == "" {
+		return &inMemoryStorage{}
+	} else {
+		return newMongoStorage(mongoURL)
+	}
 }

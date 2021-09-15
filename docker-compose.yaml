@@ -1,15 +1,15 @@
 version: '3'
 
 services:
-  redis:
-    image: redis:4
+  mongo:
+    image: mongo:4.4
     restart: always
     ports:
-      - "6379:6379"
+      - "27017:27017"
 
   application:
     build: .
     ports:
-      - "3000:3000"
-    links:
-      - redis
+      - "8080:8080"
+    environment:
+      MONGO_URL: 'mongodb://mongo:27017'

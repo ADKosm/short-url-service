@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"math/rand"
 	"sync"
 )
@@ -12,7 +13,7 @@ type inMemoryStorage struct {
 
 var _ Storage = (*inMemoryStorage)(nil)
 
-func (s *inMemoryStorage) PutURL(url RedirectURL) (Key, error) {
+func (s *inMemoryStorage) PutURL(_ context.Context, url RedirectURL) (Key, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -24,7 +25,7 @@ func (s *inMemoryStorage) PutURL(url RedirectURL) (Key, error) {
 	return key, nil
 }
 
-func (s *inMemoryStorage) GetURL(key Key) (RedirectURL, error) {
+func (s *inMemoryStorage) GetURL(_ context.Context, key Key) (RedirectURL, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
