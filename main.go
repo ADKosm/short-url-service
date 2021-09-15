@@ -2,13 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
 	"log"
-	"math/rand"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -22,19 +21,10 @@ func handleRoot(w http.ResponseWriter, _ *http.Request) {
 }
 
 type HTTPHandler struct {
-	storageMu sync.RWMutex
-	storage   map[string]string
+	storage Storage
 }
 
 var alphabet = []byte("qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890")
-
-func getRandomKey() string {
-	idBytes := make([]byte, 5)
-	for i := 0; i < len(idBytes); i++ {
-		idBytes[i] = alphabet[rand.Intn(len(alphabet))]
-	}
-	return string(idBytes)
-}
 
 type PutRequestData struct {
 	Url string `json:"url"`
@@ -53,14 +43,15 @@ func (h *HTTPHandler) handlePostUrl(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newUrlKey := getRandomKey()
-	h.storageMu.Lock()
-	h.storage[newUrlKey] = data.Url
-	h.storageMu.Unlock()
+	key, err := h.storage.PutURL(RedirectURL(data.Url))
+	if err != nil {
+		internalError(rw, err)
+		return
+	}
 	//  http://my.site.com/bdfhfd
 
 	response := PutResponseData{
-		Key: newUrlKey,
+		Key: string(key),
 	}
 	rawResponse, _ := json.Marshal(response)
 
@@ -75,21 +66,28 @@ func (h *HTTPHandler) handlePostUrl(rw http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPHandler) handleGetUrl(rw http.ResponseWriter, r *http.Request) {
 	key := strings.Trim(r.URL.Path, "/")
-	h.storageMu.RLock()
-	url, found := h.storage[key]
-	h.storageMu.RUnlock()
-	if !found {
+	url, err := h.storage.GetURL(Key(key))
+	switch {
+	case err == nil:
+		http.Redirect(rw, r, string(url), http.StatusPermanentRedirect)
+	case errors.Is(err, ErrNotFound):
 		http.NotFound(rw, r)
-		return
+	default:
+		internalError(rw, err)
 	}
-	http.Redirect(rw, r, url, http.StatusPermanentRedirect)
+}
+
+func internalError(rw http.ResponseWriter, err error) {
+	rw.WriteHeader(http.StatusInternalServerError)
+	body, _ := json.Marshal(map[string]string{"error": err.Error()})
+	_, _ = rw.Write(body)
 }
 
 func NewServer() *http.Server {
 	r := mux.NewRouter()
 
 	handler := &HTTPHandler{
-		storage: make(map[string]string),
+		storage: NewStorage(),
 	}
 
 	r.HandleFunc("/", handleRoot).Methods("GET", "POST")
