@@ -1,4 +1,4 @@
-module mod
+module miniurl
 
 go 1.16
 
