@@ -2,6 +2,7 @@ package ratelimit
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"github.com/go-redis/redis/v8"
 	"time"
@@ -22,22 +23,19 @@ type Limiter struct {
 	limit  int64
 }
 
+//go:embed incr_expirenx.lua
+var incrExpireLua string
+var incrExpireScript = redis.NewScript(incrExpireLua)
+
 func (l *Limiter) CanDoAt(ctx context.Context, ts time.Time) (bool, error) {
 	key := l.key(ts)
+	ttlMs := l.period.Milliseconds()
 
-	var incr *redis.IntCmd
-	_, err := l.client.Pipelined(ctx, func(p redis.Pipeliner) error {
-		incr = p.Incr(ctx, key)
-		p.Do(ctx, "PEXPIRE", key, 2*l.period.Milliseconds(), "NX")
-		return nil
-	})
+	rawCount, err := incrExpireScript.Run(ctx, l.client, []string{key}, ttlMs).Result()
 	if err != nil {
 		return false, err
 	}
-	count, err := incr.Result()
-	if err != nil {
-		return false, err
-	}
+	count := rawCount.(int64)
 
 	return count <= l.limit, nil
 }
