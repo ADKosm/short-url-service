@@ -9,11 +9,7 @@ import (
 	"time"
 )
 
-func NewStorage(persistentStorage storage.Storage, redisURL string) *Storage {
-	client := redis.NewClient(&redis.Options{
-		Addr: redisURL,
-	})
-
+func NewStorage(persistentStorage storage.Storage, client *redis.Client) *Storage {
 	return &Storage{
 		client:            client,
 		persistentStorage: persistentStorage,
