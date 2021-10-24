@@ -19,3 +19,7 @@ type Storage interface {
 	PutURL(ctx context.Context, url ShortedURL) (URLKey, error)
 	GetURL(ctx context.Context, key URLKey) (ShortedURL, error)
 }
+
+type IndexMaintainer interface {
+	EnsureIndices(ctx context.Context) error
+}

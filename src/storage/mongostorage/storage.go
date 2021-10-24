@@ -17,7 +17,8 @@ const dbName = "shortUrls"
 const collName = "urls"
 
 type storage struct {
-	urls *mongo.Collection
+	client *mongo.Client
+	urls   *mongo.Collection
 }
 
 func NewStorage(mongoURL string) *storage {
@@ -29,24 +30,9 @@ func NewStorage(mongoURL string) *storage {
 
 	collection := client.Database(dbName).Collection(collName)
 
-	ensureIndexes(ctx, collection)
-
 	return &storage{
-		urls: collection,
-	}
-}
-
-func ensureIndexes(ctx context.Context, collection *mongo.Collection) {
-	indexModels := []mongo.IndexModel{
-		{
-			Keys: bsonx.Doc{{Key: "_id", Value: bsonx.Int32(1)}},
-		},
-	}
-	opts := options.CreateIndexes().SetMaxTime(10 * time.Second)
-
-	_, err := collection.Indexes().CreateMany(ctx, indexModels, opts)
-	if err != nil {
-		panic(fmt.Errorf("failed to ensure indexes %w", err))
+		client: client,
+		urls:   collection,
 	}
 }
 
@@ -81,6 +67,31 @@ func (s *storage) GetURL(ctx context.Context, key storage2.URLKey) (storage2.Sho
 		return "", fmt.Errorf("somehting went wroing - %w", storage2.StorageError)
 	}
 	return result.URL, nil
+}
+
+func (s *storage) EnsureIndices(ctx context.Context) error {
+	// ensure primary index
+	indexModels := mongo.IndexModel{
+		Keys: bsonx.Doc{{Key: "_id", Value: bsonx.Int32(1)}},
+	}
+	opts := options.CreateIndexes().SetMaxTime(10 * time.Second)
+
+	_, err := s.urls.Indexes().CreateOne(ctx, indexModels, opts)
+	if err != nil {
+		return err
+	}
+
+	// ensure collection is sharded over primary index
+	if err := s.client.Database("admin").RunCommand(ctx, bson.D{
+		{"shardCollection", fmt.Sprintf("%s.%s", dbName, collName)},
+		{"key", bson.D{{"_id", 1}}}, // range-based sharding
+		{"unique", true},
+		//"options": bson.M{"locale": "simple"},
+	}).Err(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type urlItem struct {
